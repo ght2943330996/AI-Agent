@@ -1,3 +1,4 @@
+from ast import Pass
 import asyncio
 import os
 from pathlib import Path
@@ -8,11 +9,16 @@ from util import log_title
 
 
 # 获取当前工作目录
-current_dir = os.getcwd()
+current_dir = Path(os.getcwd()).parent
+memory_file_path = current_dir / 'memory' / 'memory_like.jsonl'
 
 # 初始化MCP客户端
 fetch_mcp = MCPClient('fetch', 'uvx', ['mcp-server-fetch'])
-file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesystem', current_dir])
+file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesystem', str(current_dir)])
+memory_mcp = MCPClient('memory', 'npx', ['-y', '@modelcontextprotocol/server-memory'], {"MEMORY_FILE_PATH": str(memory_file_path)})
+
+
+
 
 
 # 测试ChatOpenAI类
@@ -24,13 +30,13 @@ file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesys
 #     print(response['toolCalls'])
 
 
-# 测试mcp服务
-# async def main():
-#     fetch_mcp = MCPClient('fetch', 'uvx', ['mcp-server-fetch'])
-#     await fetch_mcp.init()
-#     tools = fetch_mcp.get_tools()
-#     print(tools)
-#     await fetch_mcp.close()
+# 测试mcp服务，记忆功能
+async def main():
+    agent = Agent('deepseek-chat', [fetch_mcp, file_mcp, memory_mcp], '必须优先查询记忆回答问题,并更新记忆', '')
+    await agent.init()
+    tools = await agent.invoke("根据我的喜好，为我制定一个旅游计划，并保存在{current_dir}/test中")
+    print(tools)
+    await agent.close()
 
 
 # 测试llm+mcp
@@ -45,18 +51,18 @@ file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesys
 
 
 # llm+mcp+rag
-async def main():
-    # prompt = f"根据knowledge文件的模型信息,对比claude_Opus_4.5和Gemini_3.0_Pro的优缺点,并给出两个模型的具体使用场景,把结果保存到{current_dir}/test中"
-    prompt = f"根据张三的信息,为他制定一个学习计划,把结果保存到{current_dir}/test中"
+# async def main():
+#     # prompt = f"根据knowledge文件的模型信息,对比claude_Opus_4.5和Gemini_3.0_Pro的优缺点,并给出两个模型的具体使用场景,把结果保存到{current_dir}/test中"
+#     prompt = f"根据张三的信息,为他制定一个学习计划,把结果保存到{current_dir}/test中"
 
-    context = await retrieve_context(prompt)
+#     context = await retrieve_context(prompt)
 
-    # Agent    # 模型名称+系统提示词+上下文
-    agent = Agent('deepseek-chat', [fetch_mcp, file_mcp], '', context)
-    await agent.init()
-    response = await agent.invoke(prompt)
-    print(response)
-    await agent.close()
+#     # Agent    # 模型名称+系统提示词+上下文
+#     agent = Agent('deepseek-chat', [fetch_mcp, file_mcp], '', context)
+#     await agent.init()
+#     response = await agent.invoke(prompt)
+#     print(response)
+#     await agent.close()
 
 
 # RAG检索

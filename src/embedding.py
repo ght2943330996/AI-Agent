@@ -40,7 +40,7 @@ class EmbeddingRetriever:
                 'input': document,
             }
         )
-        data = response.json()
+        data = response.json()      #json转字典
         # print(data['data'][0]['embedding'])    #查看向量化结果
         return data['data'][0]['embedding']
 

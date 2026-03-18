@@ -5,8 +5,8 @@ import math
 #向量储存项
 class VectorStoreItem:
     def __init__(self, embedding: List[float], document: str):
-        self.embedding = embedding
-        self.document = document
+        self.embedding = embedding                #向量
+        self.document = document                  #文档内容
 
 
 #向量储存类

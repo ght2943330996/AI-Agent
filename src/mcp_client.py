@@ -4,18 +4,21 @@ from mcp.client.stdio import stdio_client
 
 #MCP客户端类,参见MCP文档: https://modelcontextprotocol.io/docs/develop/build-client
 class MCPClient:
-    def __init__(self, name: str, command: str, args: List[str], version: Optional[str] = None):
+    def __init__(self, name: str, command: str, args: List[str], env: Optional[Dict[str, str]] = None, version: Optional[str] = None):
         self.name = name
         self.version = version or "0.0.1"
-        self.command = command
-        self.args = args
-        self.session: Optional[ClientSession] = None
+        self.command = command         # 命令行程序路径
+        self.args = args             # 命令行参数列表
+        self.env = env or {}         # 环境变量字典
+        # self.session: Optional[ClientSession] = None
         self.tools: List[Dict[str, Any]] = []
+
+        #用于关闭MCP客户端的上下文管理器
         self._stdio_context = None
         self._read = None
         self._write = None
 
-    #初始化MCP客户端
+    #初始化MCP客户端，连接到MCP服务器获取可用工具列表
     async def init(self):
         await self._connect_to_server()
 
@@ -36,7 +39,7 @@ class MCPClient:
     def get_tools(self) -> List[Dict[str, Any]]:
         return self.tools
 
-    #调用工具
+    #agent调用工具给chatopenai
     async def call_tool(self, name: str, params: Dict[str, Any]):
         if not self.session:
             raise Exception("MCP client 未初始化")
@@ -49,12 +52,12 @@ class MCPClient:
             server_params = StdioServerParameters(
                 command=self.command,
                 args=self.args,
-                env=None
+                env=self.env if self.env else None
             )
 
             # 保存上下文管理器以便正确清理
-            self._stdio_context = stdio_client(server_params)
-            self._read, self._write = await self._stdio_context.__aenter__()
+            self._stdio_context = stdio_client(server_params)  #调用stdio_client函数
+            self._read, self._write = await self._stdio_context.__aenter__()     #__aenter__ 是为了后续手动退出。
 
             # 创建会话
             self.session = ClientSession(self._read, self._write)
@@ -75,7 +78,7 @@ class MCPClient:
             ]
 
             print(
-                f"Connected to server with tools: {[tool['name'] for tool in self.tools]}"
+                f"\n连接服务器的工具: {[tool['name'] for tool in self.tools]}"
             )
         except Exception as e:
             print(f"连接失败: {e}")

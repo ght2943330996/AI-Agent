@@ -9,6 +9,7 @@ from util import log_title
 load_dotenv()
 
 
+#api文档中stream中的ToolCall类
 class ToolCall:
     #OpenAI ToolCall类
     def __init__(self, id: str, function: Dict[str, str]):
@@ -18,7 +19,7 @@ class ToolCall:
 
 class ChatOpenAI:
     #定义ChatOpenAI类"
-    def __init__(self, model: str, system_prompt: str = '', tools: List[Dict] = None, context: str = ''):
+    def __init__(self, model: str, system_prompt: str = '', tools: List[Dict] = None, context: str = ''):  #context留给RAG注入
         # 初始化OpenAI客户端
         self.llm = OpenAI(
             api_key=os.getenv('OPENAI_API_KEY'),
@@ -35,7 +36,7 @@ class ChatOpenAI:
         if context:
             self.messages.append({'role': 'user', 'content': context})
 
-    async def chat(self, prompt: Optional[str] = None) -> Dict[str, Any]:
+    async def chat(self, prompt: Optional[str] = None) -> Dict[str, Any]:  #prompt可选,返回字典
         #定义chat方法，处理用户输入并返回模型响应
         log_title('CHAT')
 
@@ -44,11 +45,11 @@ class ChatOpenAI:
             self.messages.append({'role': 'user', 'content': prompt})
 
         # 步骤2: 发送流式API请求,逐块chunk传送,实时响应
-        stream = self.llm.chat.completions.create(
+        stream = self.llm.chat.completions.create(              #调用OpenAI的chat.completions接口
             model=self.model,
             messages=self.messages,
             stream=True,
-            tools=self._get_tools_definition() if self.tools else None,  # 提供可用工具定义
+            tools=self._get_tools_definition() if self.tools else None,
         )
 
         content = ""
@@ -57,19 +58,19 @@ class ChatOpenAI:
 
         # 步骤3: 逐块处理流式接收响应
         for chunk in stream:
-            delta = chunk.choices[0].delta
+            delta = chunk.choices[0].delta     #delta会带来两个参数，需要分别处理
 
             # 处理普通Content文本内容
             if delta.content:
                 content_chunk = delta.content or ""
                 content += content_chunk
-                sys.stdout.write(content_chunk)
-                sys.stdout.flush()
+                sys.stdout.write(content_chunk)  #连续打印不换行
+                sys.stdout.flush()      #刷新缓冲区,确保立即显示
 
             # 处理ToolCall工具调用
             if delta.tool_calls:
                 for tool_call_chunk in delta.tool_calls:
-                    # 初始化新的工具调用
+                    # 初始化新的工具调用，append新的ToolCall对象
                     if len(tool_calls) <= tool_call_chunk.index:
                         tool_calls.append(ToolCall(id='', function={'name': '', 'arguments': ''}))
 
@@ -81,7 +82,7 @@ class ChatOpenAI:
                     if tool_call_chunk.function and tool_call_chunk.function.arguments:
                         current_call.function['arguments'] += tool_call_chunk.function.arguments
 
-        # 步骤4: 保存AI回复到对话历史
+        # 步骤4: messages是用于给LLM记忆的，因为每次调用llm他都会忘记历史对话，所以必须把所有历史对话都放到messages中
         self.messages.append({
             'role': 'assistant',
             'content': content,
@@ -95,6 +96,7 @@ class ChatOpenAI:
             ] if tool_calls else None
         })
 
+        #返回上下文和工具调用，以便agent调用
         return {
             'content': content,
             'toolCalls': tool_calls,
