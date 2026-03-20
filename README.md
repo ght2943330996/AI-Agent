@@ -44,7 +44,7 @@ npm install -g @modelcontextprotocol/server-filesystem
 
 ### 3. 配置环境变量
 
-编辑 `.env` 文件，填入您的 API 密钥：
+新建 `.env` 文件，复制 `.env.example` 中的内容进去，并填入您的 API 密钥：
 
 ```env
 # 大语言模型配置（示例使用 DeepSeek）

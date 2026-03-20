@@ -44,7 +44,7 @@ class ChatOpenAI:
         if prompt:
             self.messages.append({'role': 'user', 'content': prompt})
 
-        # 步骤2: 发送流式API请求,逐块chunk传送,实时响应
+        # 步骤2: 发送流式API请求,逐块chunk返回结果（如果不采用流式传输则返回response全部结果）
         stream = self.llm.chat.completions.create(              #调用OpenAI的chat.completions接口
             model=self.model,
             messages=self.messages,
