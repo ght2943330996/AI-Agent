@@ -19,6 +19,7 @@
 | **ChatOpenAI** | `src/chat_openai.py` | 大语言模型对话封装，支持流式输出和工具调用 |
 | **EmbeddingRetriever** | `src/embedding.py` | 嵌入模型检索器，实现文档向量化 |
 | **VectorStore** | `src/vector_store.py` | 向量存储，基于余弦相似度检索 |
+| **Session** | `src/session.py` | 会话管理，支持多会话独立记忆 |
 
 ## 快速开始
 
@@ -63,22 +64,52 @@ cd src
 python main.py
 ```
 
-## 使用示例
-
-### 示例 1：模型对比分析
-
-```python
-prompt = "根据 knowledge 文件的模型信息，对比 Claude_Opus_4.5 和 Gemini_3.0_Pro 的优缺点，并给出两个模型的具体使用场景，把结果保存到 test 目录中"
-```
-
-### 示例 2：个性化学习计划
-
-```python
-prompt = "根据张三的信息，为他制定一个学习计划，把结果保存到 test 目录中"
-```
+<!--
 ![运行截图](./test_picture/test1.png)
 
-![运行截图](./test_picture/test2.png)
+![运行截图](./test_picture/test2.png) -->
+
+## 高级功能
+
+### 连续对话模式
+
+支持多轮连续对话，保持上下文记忆：
+
+```python
+await continuous_chat()
+```
+
+**支持的命令：**
+- `exit` / `quit` / `退出` - 退出对话
+- `clear` - 清空对话历史
+- `history` - 查看对话历史
+
+### 多会话管理模式
+
+基于 Memory MCP 实现多对话管理，每个会话拥有独立的记忆空间：
+
+```python
+await session_chat()
+```
+
+**命令列表：**
+
+| 命令 | 说明 |
+|------|------|
+| `/new [名称]` | 创建新会话（可选传名称，默认自动命名） |
+| `/list` | 列出所有会话 |
+| `/switch <编号>` | 按列表编号切换到指定会话 |
+| `/delete <编号>` | 按列表编号删除指定会话 |
+| `/clear` | 清空当前会话的对话历史 |
+| `/history` | 查看当前会话的对话历史 |
+| `/help` | 显示帮助信息 |
+| `exit` / `quit` / `退出` | 退出程序 |
+
+**多会话特性：**
+- 每个会话拥有独立的 Memory MCP 和知识图谱
+- 会话间记忆隔离，互不干扰
+- 支持会话持久化（memory 文件保存在 `memory/sessions/` 目录）
+- 自动记忆管理：每次对话优先查询记忆，对话结束自动存储重要信息
 
 ## 技术参考
 
