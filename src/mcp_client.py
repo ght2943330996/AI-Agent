@@ -1,85 +1,123 @@
 from typing import List, Dict, Any, Optional
+import asyncio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-#MCP客户端类,参见MCP文档: https://modelcontextprotocol.io/docs/develop/build-client
+
+# MCP客户端类，参见MCP文档: https://modelcontextprotocol.io/docs/develop/build-client
+#
+# 实现说明：
+#   stdio_client 内部使用 anyio TaskGroup / CancelScope，要求从进入到退出都在
+#   同一个 asyncio Task 中执行。为了支持多个 MCPClient 实例同时存活（多会话场景），
+#   每个客户端在 init() 时会启动一个独立的后台 Task 来持有连接生命周期，
+#   工具调用通过 asyncio.Queue 传递给该 Task 执行，从而避免跨 Task 的 scope 错误。
 class MCPClient:
-    def __init__(self, name: str, command: str, args: List[str], env: Optional[Dict[str, str]] = None, version: Optional[str] = None):
+    def __init__(self, name: str, command: str, args: List[str],
+                 env: Optional[Dict[str, str]] = None,
+                 version: Optional[str] = None):
         self.name = name
         self.version = version or "0.0.1"
-        self.command = command         # 命令行程序路径
-        self.args = args             # 命令行参数列表
-        self.env = env or {}         # 环境变量字典
-        # self.session: Optional[ClientSession] = None
+        self.command = command
+        self.args = args
+        self.env = env or {}
         self.tools: List[Dict[str, Any]] = []
 
-        #用于关闭MCP客户端的上下文管理器
-        self._stdio_context = None
-        self._read = None
-        self._write = None
+        # 内部状态（由后台 Task 管理）
+        self._ready_event: asyncio.Event = asyncio.Event()
+        self._call_queue: asyncio.Queue = asyncio.Queue()   # (tool_name, params, Future)
+        self._stop_event: asyncio.Event = asyncio.Event()
+        self._bg_task: Optional[asyncio.Task] = None
+        self._init_error: Optional[Exception] = None        # 连接失败时保存异常
 
-    #初始化MCP客户端，连接到MCP服务器获取可用工具列表
+    # ------------------------------------------------------------------
+    # 公共接口
+    # ------------------------------------------------------------------
+
     async def init(self):
-        await self._connect_to_server()
+        # await self._connect_to_server()
 
-    #关闭MCP客户端
+        """启动后台 Task，连接 MCP 服务器并获取工具列表。"""
+        self._bg_task = asyncio.create_task(
+            self._run(), name=f'mcp-{self.name}'
+        )
+        # 等待连接就绪（或失败）
+        await self._ready_event.wait()
+        if self._init_error:
+            raise self._init_error
+
     async def close(self):
-        if self.session:
+        """通知后台 Task 退出，等待其结束。"""
+        self._stop_event.set()
+        if self._bg_task and not self._bg_task.done():
             try:
-                await self.session.__aexit__(None, None, None)
-            except:
-                pass
-        if self._stdio_context:
-            try:
-                await self._stdio_context.__aexit__(None, None, None)
-            except:
-                pass
+                await asyncio.wait_for(self._bg_task, timeout=5)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                self._bg_task.cancel()
+                try:
+                    await self._bg_task
+                except Exception:
+                    pass
 
-    #获取可用工具列表
     def get_tools(self) -> List[Dict[str, Any]]:
         return self.tools
-
-    #agent调用工具给chatopenai
-    async def call_tool(self, name: str, params: Dict[str, Any]):
-        if not self.session:
+    #用于agent调用工具，返回工具执行结果
+    async def call_tool(self, name: str, params: Dict[str, Any]) -> Any:
+        """在后台 Task 中执行工具调用，通过 Future 返回结果。"""
+        if not self._ready_event.is_set() or self._init_error:
             raise Exception("MCP client 未初始化")
-        result = await self.session.call_tool(name, arguments=params)
-        return result
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future = loop.create_future()
+        await self._call_queue.put((name, params, future))
+        return await future
+
+    # ------------------------------------------------------------------
+    # 后台 Task：持有完整的 stdio_client / ClientSession 生命周期
+    # ------------------------------------------------------------------
 
     #连接到MCP服务器 参见MCP文档: https://modelcontextprotocol.io/docs/develop/build-client
-    async def _connect_to_server(self):
+    async def _run(self):
+        server_params = StdioServerParameters(
+            command=self.command,
+            args=self.args,
+            env=self.env if self.env else None,
+        )
         try:
-            server_params = StdioServerParameters(
-                command=self.command,
-                args=self.args,
-                env=self.env if self.env else None
-            )
+            async with stdio_client(server_params) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
 
-            # 保存上下文管理器以便正确清理
-            self._stdio_context = stdio_client(server_params)  #调用stdio_client函数
-            self._read, self._write = await self._stdio_context.__aenter__()     #__aenter__ 是为了后续手动退出。
+                    tools_result = await session.list_tools()
+                    self.tools = [
+                        {
+                            'name': tool.name,
+                            'description': tool.description,
+                            'inputSchema': tool.inputSchema,
+                        }
+                        for tool in tools_result.tools
+                    ]
+                    print(f"连接服务器的工具: {[t['name'] for t in self.tools]}")
 
-            # 创建会话
-            self.session = ClientSession(self._read, self._write)
-            await self.session.__aenter__()
+                    # 标记就绪，唤醒 init() 的等待
+                    self._ready_event.set()
 
-            # 初始化会话
-            await self.session.initialize()
+                    # 持续处理工具调用请求，直到收到停止信号
+                    while not self._stop_event.is_set():
+                        try:
+                            name, params, future = await asyncio.wait_for(
+                                self._call_queue.get(), timeout=0.5
+                            )
+                        except asyncio.TimeoutError:
+                            continue
 
-            # 获取工具列表
-            tools_result = await self.session.list_tools()
-            self.tools = [
-                {
-                    'name': tool.name,
-                    'description': tool.description,
-                    'inputSchema': tool.inputSchema
-                }
-                for tool in tools_result.tools
-            ]
+                        try:
+                            result = await session.call_tool(name, arguments=params)
+                            if not future.done():
+                                future.set_result(result)
+                        except Exception as e:
+                            if not future.done():
+                                future.set_exception(e)
 
-            print(
-                f"\n连接服务器的工具: {[tool['name'] for tool in self.tools]}"
-            )
         except Exception as e:
+            self._init_error = e
+            self._ready_event.set()   # 解除 init() 的阻塞，让它抛出异常
             print(f"连接失败: {e}")
-            raise e

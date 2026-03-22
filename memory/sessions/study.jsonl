@@ -1,0 +1,9 @@
+{"type":"entity","name":"AI Agent学习规划","entityType":"学习计划","observations":["包含四个阶段：基础概念、核心技术、实际应用、前沿技术","预计总学习时间8-10周","从基础概念到实际应用的完整路径","包含书籍、课程、实践平台等资源推荐"]}
+{"type":"entity","name":"AI Agent基础概念","entityType":"知识领域","observations":["包括AI Agent定义、Agent类型、核心组件","学习时间1-2周","涵盖反应式Agent、基于模型的Agent、基于目标的Agent等"]}
+{"type":"entity","name":"AI Agent核心技术","entityType":"知识领域","observations":["包括规划与推理、学习与适应、多Agent系统","学习时间3-4周","涵盖强化学习、规划算法、多Agent协作等"]}
+{"type":"entity","name":"AI Agent实际应用","entityType":"知识领域","observations":["包括工具使用、记忆系统、实际项目","学习时间2-3周","涵盖函数调用、API集成、知识图谱等"]}
+{"type":"entity","name":"AI Agent前沿技术","entityType":"知识领域","observations":["包括LLM与Agent、自主Agent、专业领域Agent","需要持续学习","涵盖思维链、AutoGPT、代码生成Agent等"]}
+{"type":"relation","from":"AI Agent学习规划","to":"AI Agent基础概念","relationType":"包含第一阶段"}
+{"type":"relation","from":"AI Agent学习规划","to":"AI Agent核心技术","relationType":"包含第二阶段"}
+{"type":"relation","from":"AI Agent学习规划","to":"AI Agent实际应用","relationType":"包含第三阶段"}
+{"type":"relation","from":"AI Agent学习规划","to":"AI Agent前沿技术","relationType":"包含第四阶段"}
