@@ -78,66 +78,42 @@ async def retrieve_context(prompt: str) -> str:
             await embedding_retriever.embed_document(content)
 
     context_results = await embedding_retriever.retrieve(prompt)
-    log_title('上下文')
+    log_title('RAG检索结果')
     print(context_results)
 
     return '\n'.join(item['document'] for item in context_results)
 
 
-#连续对话
-async def continuous_chat():
-    """连续对话模式 - 保持会话上下文，支持多轮对话"""
-    agent = Agent(
-        'deepseek-chat',
-        [fetch_mcp, file_mcp, memory_mcp],
-        '你是一个智能助手，可以查询和更新记忆。请优先查询用户的记忆信息来回答问题。',
-        ''
+# RAG 模式对话（不保存记忆，不写入 index）
+async def rag_invoke(
+    prompt: str,
+    model: str,
+) -> str:
+    # print('正在检索知识库...')
+    context = await retrieve_context(prompt)
+
+    rag_system_prompt = (
+        '你是一个基于知识库的智能问答助手。'
+        '请严格根据提供的知识库上下文回答用户问题，'
+        '若上下文中没有相关信息，请如实说明。'
+        '不要从记忆中查找或存储任何信息。'
     )
 
-    await agent.init()
+    #RAG文件读写权限设置
+    rag_file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesystem', str(current_dir/'knowledge')])
 
-    print("\n" + "=" * 80)
-    print("提示：输入 'exit' 或 'quit' 退出对话")
-    print("提示：输入 'clear' 清空对话历史")
-    print("提示：输入 'history' 查看对话历史")
-    print("=" * 80 + "\n")
-
+    temp_agent = Agent(
+        model=model,
+        mcp_clients=[fetch_mcp, rag_file_mcp],
+        system_prompt=rag_system_prompt,
+        context=context,
+    )
     try:
-        while True:
-            # 获取用户输入
-            user_input = input("用户: ").strip()
-
-            # 处理特殊命令
-            if user_input.lower() in ['exit', 'quit', '退出']:
-                print("再见！")
-                break
-            elif user_input.lower() == 'clear':
-                agent.clear_conversation()
-                print("对话历史已清空")
-                continue
-            elif user_input.lower() == 'history':
-                history = agent.get_conversation_history()
-                log_title('对话历史')
-                for msg in history:
-                    role = msg.get('role', 'unknown')
-                    content = msg.get('content', '')
-                    if content:
-                        print(f"[{role}]: {content[:100]}..." if len(content) > 100 else f"[{role}]: {content}")
-                continue
-            elif not user_input:
-                continue
-
-            try:
-                response = await agent.invoke(user_input)
-                print("\n")
-            except Exception as e:
-                print(f"\n错误: {e}\n")
-
-    except KeyboardInterrupt:
-        print("\n\n对话被中断")
+        await temp_agent.init()
+        result = await temp_agent.invoke(prompt)
     finally:
-        await agent.close()
-        print("连接已关闭")
+        await temp_agent.close()
+    return result
 
 
 # 多会话命令行模式
@@ -146,10 +122,10 @@ async def session_chat():
         model='deepseek-chat',
         system_prompt=(
             '你叫Dummy，是一个智能助手，拥有持久记忆能力。你必须严格遵守以下记忆规则：\n'
-            '1. 【每次对话开始】调用 search_nodes 或 read_graph 查询与用户问题相关的已有记忆，优先基于记忆回答。\n'
+            '1. 【每次对话开始】调用 search_nodes 和 read_graph 查询与用户问题相关的已有记忆，优先基于记忆回答。\n'
             '2. 【每次对话结束前】将本轮对话中出现的重要信息（用户偏好、事实、计划、人名、结论等）'
             '用 create_entities 和 add_observations 存入知识图谱，用 create_relations 建立实体间关系。\n'
-            '3. 若用户明确说"不用记"或信息无价值，则跳过存储。\n'
+            '3. 若用户明确说"不用记"或信息无价值或网上搜索的信息，则跳过存储。\n'
             '4. 存储时使用中文，实体名称简洁清晰。'
         ),
         default_extra_mcp_clients=[fetch_mcp, file_mcp],      #默认工具
@@ -180,11 +156,15 @@ async def session_chat():
 
     # manager.print_help()
 
+    # RAG 模式标志（仅在本次运行期间有效，不持久化）
+    rag_mode: bool = False
+
     try:  #捕获异常，ctrl+c退出循环
         while True:
             # 当前会话名称提示
             current = manager.current_session
-            session_label = f'[{current.name}]' if current else '[无会话]'
+            session_name = current.name if current else '无会话'
+            session_label = '[RAG]' if rag_mode else f'[{session_name}]'
             user_input = input(f'\n{session_label} 用户: ').strip()
 
             if not user_input:
@@ -284,16 +264,43 @@ async def session_chat():
                         if content:
                             print(f"[{role}]: {content[:100]}..." if len(content) > 100 else f"[{role}]: {content}")
 
-            # 普通对话
+            # /rag
+            elif user_input.lower() == '/rag':
+                rag_mode = not rag_mode
+                if rag_mode:
+                    log_title('RAG 模式')
+                    print('再次输入 /rag 可退出 RAG 模式。')
+                else:
+                    print('已退出 RAG 模式。')
+
+            # 未知命令（以/开头但不是已知命令）
+            elif user_input.startswith('/'):
+                print(f"未知命令: {user_input}")
+                print("可用命令: /help, /new, /list, /switch, /delete, /clear, /history, /rag, /quit")
+
+            # 普通对话 / RAG 对话
             else:
                 if not manager.current_session:
-                    print('当前没有活跃会话，请先用 /new 创建一个会话')
+                    print('当前没有会话，请先用 /new 创建一个会话')
                     continue
-                try:
-                    await manager.invoke(user_input)
-                    print()  # 流式输出后换行
-                except Exception as e:
-                    print(f'\n错误: {e}\n')
+
+                if rag_mode:
+                    # RAG模式
+                    try:
+                        answer = await rag_invoke(
+                            prompt=user_input,
+                            model=manager.model,
+                        )
+                        print(f'\n{answer}\n')
+                    except Exception as e:
+                        print(f'\nRAG 错误: {e}\n')
+                else:
+                    # 普通会话模式
+                    try:
+                        await manager.invoke(user_input)
+                        print()  # 流式输出后换行
+                    except Exception as e:
+                        print(f'\n错误: {e}\n')
 
     except KeyboardInterrupt:
         print('\n\n对话被中断')

@@ -3,6 +3,7 @@
 {"type":"entity","name":"海滩旅游","entityType":"TravelCategory","observations":["用户喜欢的旅游目的地类型"]}
 {"type":"entity","name":"运动","entityType":"Hobby","observations":["用户的兴趣爱好"]}
 {"type":"entity","name":"阅读","entityType":"Hobby","observations":["用户的兴趣爱好"]}
+{"type":"entity","name":"Dummy","entityType":"智能助手","observations":["拥有持久记忆能力","能够存储和检索对话中的重要信息","使用知识图谱管理记忆","可以操作文件和目录","具有网络访问能力","能够创建实体和建立关系"]}
 {"type":"relation","from":"用户","to":"雪山旅游","relationType":"喜欢"}
 {"type":"relation","from":"用户","to":"海滩旅游","relationType":"喜欢"}
 {"type":"relation","from":"用户","to":"运动","relationType":"喜欢"}

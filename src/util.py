@@ -18,18 +18,17 @@ def print_welcome():
     print()
     # Logo ASCII 艺术 - 大号 DummyCode
     logo = f"""{Fore.CYAN}{Style.BRIGHT}
-    ██████╗ ██╗   ██╗███╗   ███╗███╗   ███╗██╗   ██╗ ██████╗ ██████╗ ██████╗ ███████╗
-    ██╔══██╗██║   ██║████╗ ████║████╗ ████║██║   ██║██╔════╝██╔═══██╗██╔══██╗██╔════╝
-    ██║  ██║██║   ██║██╔████╔██║██╔████╔██║██║   ██║██║     ██║   ██║██║  ██║█████╗
-    ██║  ██║██║   ██║██║╚██╔╝██║██║╚██╔╝██║██║   ██║██║     ██║   ██║██║  ██║██╔══╝
-    ██████╔╝╚██████╔╝██║ ╚═╝ ██║██║ ╚═╝ ██║╚██████╔╝╚██████╗╚██████╔╝██████╔╝███████╗
-    ╚═════╝  ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝{Style.RESET_ALL}
+    ██████╗  ██╗   ██╗ ███╗   ███╗ ███╗   ███╗ ██╗   ██╗  ██████╗  ██████╗  ██████╗  ███████╗
+    ██╔══██╗ ██║   ██║ ████╗ ████║ ████╗ ████║ ╚██╗ ██╔╝ ██╔════╝ ██╔═══██╗ ██╔══██╗ ██╔════╝
+    ██║  ██║ ██║   ██║ ██╔████╔██║ ██╔████╔██║  ╚████╔╝  ██║      ██║   ██║ ██║  ██║ █████╗
+    ██║  ██║ ██║   ██║ ██║╚██╔╝██║ ██║╚██╔╝██║   ╚██╔╝   ██║      ██║   ██║ ██║  ██║ ██╔══╝
+    ██████╔╝ ╚██████╔╝ ██║ ╚═╝ ██║ ██║ ╚═╝ ██║    ██║    ╚██████╗ ╚██████╔╝ ██████╔╝ ███████╗
+    ╚═════╝   ╚═════╝  ╚═╝     ╚═╝ ╚═╝     ╚═╝    ╚═╝     ╚═════╝  ╚═════╝  ╚═════╝  ╚══════╝{Style.RESET_ALL}
     """
     print(logo)
 
     # 欢迎语
     print(f"    {Style.BRIGHT}{Fore.CYAN}欢迎使用 DummyCode{Style.RESET_ALL}")
-    print(f"    {Fore.LIGHTBLACK_EX}一款基于 LLM + MCP + RAG 的智能代码助手{Style.RESET_ALL}")
     print()
 
     # 快速开始提示
@@ -37,6 +36,7 @@ def print_welcome():
     print(f"      {Fore.YELLOW}/help{Style.RESET_ALL}  {Fore.LIGHTBLACK_EX}- 查看所有可用命令{Style.RESET_ALL}")
     print(f"      {Fore.YELLOW}/new{Style.RESET_ALL}   {Fore.LIGHTBLACK_EX}- 创建新会话{Style.RESET_ALL}")
     print(f"      {Fore.YELLOW}/list{Style.RESET_ALL}  {Fore.LIGHTBLACK_EX}- 列出所有会话{Style.RESET_ALL}")
+    print(f"      {Fore.YELLOW}/rag{Style.RESET_ALL}   {Fore.LIGHTBLACK_EX}- 切换 RAG 模式{Style.RESET_ALL}")
     print()
 
     # 分隔线
