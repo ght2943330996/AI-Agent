@@ -95,7 +95,7 @@ class MCPClient:
                         }
                         for tool in tools_result.tools
                     ]
-                    print(f"连接服务器的工具: {[t['name'] for t in self.tools]}")
+                    # print(f"连接服务器的工具: {[t['name'] for t in self.tools]}")
 
                     # 标记就绪，唤醒 init() 的等待
                     self._ready_event.set()

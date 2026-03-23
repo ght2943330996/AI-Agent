@@ -5,7 +5,7 @@ from pathlib import Path
 from mcp_client import MCPClient
 from agent import Agent
 from embedding import EmbeddingRetriever
-from util import log_title
+from util import log_title, print_welcome
 from session import SessionManager
 
 
@@ -155,10 +155,7 @@ async def session_chat():
         default_extra_mcp_clients=[fetch_mcp, file_mcp],      #默认工具
     )
 
-    print()
-    print('=' * 80)
-    print('  欢迎使用DummyCode！输入 /help 查看命令列表')
-    print('=' * 80)
+    print_welcome()
 
     # 启动时自动创建第一个会话
     # print('\n正在创建会话...')
@@ -181,7 +178,7 @@ async def session_chat():
         print('\n无历史会话，正在创建默认会话...')
         await manager.create_session(name='默认会话')
 
-    manager.print_help()
+    # manager.print_help()
 
     try:  #捕获异常，ctrl+c退出循环
         while True:

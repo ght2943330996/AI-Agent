@@ -17,7 +17,7 @@ class Agent:
 
     #初始化Agent
     async def init(self):
-        log_title('MCP列表')
+        # log_title('MCP列表')
         #循环为每个工作连接MCP服务器
         for client in self.mcp_clients:
             await client.init()
