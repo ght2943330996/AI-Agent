@@ -61,19 +61,17 @@ class Session:
 
 
 
-    #初始化会话（连接 MCP 服务器）
+    #初始化会话（连接 MCP 服务器） 初始化Agent，MCPclient
     async def init(self):
         if not self._initialized:
             await self.agent.init()
             self._initialized = True
-            # log_title(f'会话已初始化: {self.name}')
 
     #关闭会话（断开 MCP 连接）
     async def close(self):
         if self._initialized:
             await self.agent.close()
             self._initialized = False
-            # log_title(f'会话已关闭: {self.name}')
 
 
 
@@ -330,10 +328,10 @@ class SessionManager:
         return None
 
 
-    #当前会话发送消息
+    #确保当前会话发送消息
     async def invoke(self, prompt: str) -> str:
         if not self.current_session:
-            raise RuntimeError('当前没有活跃会话，请先调用 create_session() 或 switch_session()')
+            raise RuntimeError('当前没有会话，请先调用 create_session() 或 switch_session()')
         return await self.current_session.invoke(prompt)
 
     #关闭所有会话的 MCP 连接

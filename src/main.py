@@ -67,7 +67,7 @@ memory_mcp = MCPClient('memory', 'npx', ['-y', '@modelcontextprotocol/server-mem
 
 
 # RAG检索
-async def retrieve_context(prompt: str) -> str:
+async def retrieve_context(prompt: str) -> List[Dict]:
     embedding_retriever = EmbeddingRetriever("BAAI/bge-m3")     #嵌入模型名称
     knowledge_dir = Path(current_dir) / 'knowledge'         #RAG知识库目录
 
@@ -81,7 +81,7 @@ async def retrieve_context(prompt: str) -> str:
     log_title('RAG检索结果')
     print(context_results)
 
-    return '\n'.join(item['document'] for item in context_results)
+    return context_results
 
 
 # RAG 模式对话（不保存记忆，不写入 index）
@@ -90,23 +90,37 @@ async def rag_invoke(
     model: str,
 ) -> str:
     # print('正在检索知识库...')
-    context = await retrieve_context(prompt)
+    context_results = await retrieve_context(prompt)
 
-    rag_system_prompt = (
-        '你是一个基于知识库的智能问答助手。'
-        '请严格根据提供的知识库上下文回答用户问题，'
-        '若上下文中没有相关信息，请如实说明。'
-        '不要从记忆中查找或存储任何信息。'
-    )
+    # 构建格式化的RAG上下文
+    formatted_context = '\n\n---\n\n'.join([
+        f"[相关度: {item['score']:.2f}]\n{item['document']}"
+        for item in context_results
+    ]) if context_results else "（未检索到相关内容）"
 
-    #RAG文件读写权限设置
-    rag_file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesystem', str(current_dir/'knowledge')])
+    rag_system_prompt = f"""你是一个智能助手，专门基于检索到的知识库内容回答用户问题。
+        ## 核心规则（必须遵守）
+        1. **直接使用RAG结果回答** - 下方已提供检索到的相关内容，请基于这些内容直接回答用户问题
+        2. **禁止重复检索** - 除非RAG结果完全无法回答问题，否则不要调用 list_directory、read_text_file 等文件读取工具
+        3. **RAG结果已足够** - 检索结果按相关度排序，优先使用相关度高的内容
+
+        ## 已检索到的相关内容
+        {formatted_context}
+
+        ## 回答要求
+        - 基于上述RAG内容，准确、简洁地回答用户问题
+        - 如果RAG内容包含答案，直接回答，不要额外操作
+        - 只有当RAG内容完全不相关或不足以回答时，才考虑使用工具获取更多信息
+        """
+
+    #RAG文件读写权限设置（仅用于保存结果，不用于读取）
+    rag_file_mcp = MCPClient('file', 'npx', ['-y', '@modelcontextprotocol/server-filesystem', str(current_dir/'test')])
 
     temp_agent = Agent(
         model=model,
         mcp_clients=[fetch_mcp, rag_file_mcp],
         system_prompt=rag_system_prompt,
-        context=context,
+        context='',  # context已包含在system_prompt中
     )
     try:
         await temp_agent.init()
@@ -133,23 +147,18 @@ async def session_chat():
 
     print_welcome()
 
-    # 启动时自动创建第一个会话
-    # print('\n正在创建会话...')
-    # await manager.create_session(name='默认会话')      #返回一个session
-    # manager.print_help()   #通过实例调用方法时，Python 会自动将实例本身manager作为第一个参数传给方法
-
     # 启动时尝试从 index.json 恢复历史会话，否则创建默认会话
     restored = manager.load_index()
     if restored:
         sessions = manager.list_sessions()
-        # print(f'\n历史会话：')
+
         manager.print_sessions(sessions)
 
         # 恢复后的当前会话处于懒初始化状态，在此立即连接 MCP
         current = manager.current_session
         if current and not current._initialized:
             print(f'正在连接会话「{current.name}」...')
-            await current.init()
+            await current.init()  #初始化mcpclient,agent
     else:
         print('\n无历史会话，正在创建默认会话...')
         await manager.create_session(name='默认会话')

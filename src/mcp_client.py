@@ -29,14 +29,11 @@ class MCPClient:
         self._bg_task: Optional[asyncio.Task] = None
         self._init_error: Optional[Exception] = None        # 连接失败时保存异常
 
-    # ------------------------------------------------------------------
-    # 公共接口
-    # ------------------------------------------------------------------
 
+    # 初始化MCP客户端
     async def init(self):
         # await self._connect_to_server()
 
-        """启动后台 Task，连接 MCP 服务器并获取工具列表。"""
         self._bg_task = asyncio.create_task(
             self._run(), name=f'mcp-{self.name}'
         )
@@ -45,8 +42,8 @@ class MCPClient:
         if self._init_error:
             raise self._init_error
 
+    #关闭MCP客户端
     async def close(self):
-        """通知后台 Task 退出，等待其结束。"""
         self._stop_event.set()
         if self._bg_task and not self._bg_task.done():
             try:
@@ -60,9 +57,10 @@ class MCPClient:
 
     def get_tools(self) -> List[Dict[str, Any]]:
         return self.tools
+
+
     #用于agent调用工具，返回工具执行结果
     async def call_tool(self, name: str, params: Dict[str, Any]) -> Any:
-        """在后台 Task 中执行工具调用，通过 Future 返回结果。"""
         if not self._ready_event.is_set() or self._init_error:
             raise Exception("MCP client 未初始化")
         loop = asyncio.get_event_loop()
@@ -70,9 +68,6 @@ class MCPClient:
         await self._call_queue.put((name, params, future))
         return await future
 
-    # ------------------------------------------------------------------
-    # 后台 Task：持有完整的 stdio_client / ClientSession 生命周期
-    # ------------------------------------------------------------------
 
     #连接到MCP服务器 参见MCP文档: https://modelcontextprotocol.io/docs/develop/build-client
     async def _run(self):
