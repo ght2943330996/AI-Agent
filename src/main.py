@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from mcp_client import MCPClient
 from agent import Agent
+from read_doc import DocumentReader
 from embedding import EmbeddingRetriever
 from util import log_title, print_welcome
 from session import SessionManager
@@ -12,6 +13,7 @@ from session import SessionManager
 # 获取工作根目录
 current_dir = Path(os.getcwd()).parent
 memory_file_path = current_dir / 'memory' / 'memory_like.jsonl'
+doc_reader = DocumentReader()
 
 # 初始化MCP客户端
 fetch_mcp = MCPClient('fetch', 'uvx', ['mcp-server-fetch'])
@@ -74,7 +76,7 @@ async def retrieve_context(prompt: str) -> List[Dict]:
     files = list(knowledge_dir.iterdir())
     for file in files:
         if file.is_file():
-            content = file.read_text(encoding='utf-8')
+            content = doc_reader.read_knowledge_file(file)
             await embedding_retriever.embed_document(content)
 
     context_results = await embedding_retriever.retrieve(prompt)
